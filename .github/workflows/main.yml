@@ -29,6 +29,8 @@ jobs:
       
     - name: Publish
       run: |
+        git branch -a
+        git fetch --depth=1 origin master
         git checkout master
         ls
         ls | grep -v public | xargs rm -r
