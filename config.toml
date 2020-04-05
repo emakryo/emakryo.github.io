@@ -2,3 +2,8 @@ baseURL = "http://example.org/"
 languageCode = "ja-jp"
 title = "emakryo's blog"
 theme = "ananke"
+
+[params]
+github = "https://github.com/emakryo/emakryo.github.io"
+twitter = "https://twitter.com/cruelturtle"
+linkedin = "https://www.linkedin.com/in/諒亮-亀澤-8503a1176/?locale=en_US"
