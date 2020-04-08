@@ -8,6 +8,7 @@ draft: true
 [Judge system update test contest](https://atcoder.jp/contests/judge-update-202004)が開催され、
 そろそろAtcoderの実行環境がアップデートされそうになっています。
 この記事では、新しいRust実行環境で利用可能になったcrateとその使い道を考えてみます。
+筆者は普段、競技プログラミングではC++を使っているのでそれに比べてどうかという観点も含まれています。
 
 # 実行環境
 
@@ -58,11 +59,17 @@ rustc-hash = "=1.1.0"
 smallvec = "=1.2.0"
 ```
 
-他の依存関係し子孫になっていて直接触れることのないcrateも含まれていると思いますので、
+他の依存関係の子孫になっていて直接触ることのないcrateも含まれていると思うので、
 次のcrateについてそれぞれ使い道を考えていきます。
 
 - [num](https://rust-num.github.io/num/num/index.html)
-- 
+- [rand](https://docs.rs/rand/0.7.3/rand/)
+- [petgraph](https://docs.rs/petgraph/0.5.0/petgraph/index.html)
+- [permutohedron](https://docs.rs/permutohedron/0.2.4/permutohedron/)
+- [superslice](https://docs.rs/superslice/1.0.0/superslice/)
+- [itertools](https://docs.rs/itertools/0.9.0/itertools/)
+- [proconio](https://docs.rs/proconio/0.4.1/proconio/)
+
 
 # num
 https://rust-num.github.io/num/num/index.html
@@ -107,6 +114,7 @@ fn main() {
 ```
 
 # rand
+https://docs.rs/rand/0.7.3/rand/
 
 乱数生成器の実装です。一番よく使うのは一様分布からのサンプリングでしょうか。
 `(0, 1]` からの`f64`のサンプリングは簡単です。
@@ -121,9 +129,9 @@ fn main() {
 }
 ```
 
-整数の区間`[a, b)`からのサンプリングはもちろんライブラリを使ってもいいですが、`f64`の値から計算する方が楽かもしれないです。
+整数区間`[a, b)`からの一様分布のサンプリングはもちろんライブラリを使ってもいいですが、`f64`の値から計算する方が楽かもしれないです。
+ライブラリを使った例は下のようになります。
 
-ライブラリ
 ```rust
 use rand::{Rng, SeedableRng};
 use rand::distributions::{Distribution, Uniform};
@@ -141,3 +149,206 @@ fn main() {
 速度的に不十分な場合は検討しても良いかもしれません。
 （ただし、atcoderではそんな状況はほぼないと思います）
 
+# ndarray
+
+多次元配列の実装です。
+
+# nalgebra
+
+低次元の線形代数ライブラリで6次元程度までの線形変換や行列分解などが実装されています。
+
+# petgraph
+https://docs.rs/petgraph/0.5.0/petgraph/
+
+グラフとグラフアルゴリズムが実装されています。
+普通は自作ライブラリや毎回手書きするようなアルゴリズムもあるので慣れれば便利かもしれません。
+競技プログラミングでよく使うのは次のようなものでしょうか。
+
+- `petgraph::graph::{Graph, UnGraph, DiGraph}` (隣接リスト)
+- `petgraph::matrix_graph::MatirxGraph` (隣接行列)
+- `petgraph::algo::connected_components`
+- `petgraph::algo::dijkstra`
+- `petgraph::algo::tarjan_scc` (強連結成分分解)
+- `petgraph::algo::bellman_ford`
+- `petgraph::algo::toposort`
+- `petgraph::algo::min_spanning_tree` (Kruskal's algorithm)
+- `petgraph::unionfind::UnionFind`
+
+最小全域木を例にして書いてみます。
+
+```rust
+use petgraph::graph::UnGraph;
+use petgraph::algo::min_spanning_tree;
+
+fn main() {
+    let g: UnGraph<u32, u32> = UnGraph::new_undirected();
+    // Example
+    // 0 - 1 - 2 - 3 - 4
+    //      \ /   /
+    //       6 - 5 
+    g.extend_with_edges(&[
+        (0, 1), (1, 2), (2, 3), (3, 4), (3, 5),
+        (1, 6), (2, 6), (5, 6),
+    ]);
+
+    let min_span = min_spanning_tree(&g);
+    for x in min_span {
+        println!("{:?}", x);
+    }
+
+    // Node { weight: 0 }
+    // Node { weight: 0 }
+    // Node { weight: 0 }
+    // Node { weight: 0 }
+    // Node { weight: 0 }
+    // Node { weight: 0 }
+    // Node { weight: 0 }
+    // Edge { source: 0, target: 1, weight: 0 }
+    // Edge { source: 2, target: 3, weight: 0 }
+    // Edge { source: 2, target: 6, weight: 0 }
+    // Edge { source: 1, target: 6, weight: 0 }
+    // Edge { source: 5, target: 6, weight: 0 }
+    // Edge { source: 3, target: 4, weight: 0 }
+
+    // Resulting graph
+    // 0 - 1 - 2 - 3 - 4
+    //      \
+    //       6 - 5
+
+}
+```
+
+# indexmap
+
+挿入順が保存されるハッシュテーブル`IndexMap`の実装です。`std::collection::HashMap`と同じようなAPIを持っています。
+挿入順が保存される集合`IndexSet`もあります。
+
+# ordered_float
+
+rustの浮動小数点数は`Ord` traitを満たしていないので、そのような値が期待されるようなgenericな関数と組み合わせて使うことができません。
+`Ord`を要求する関数を浮動小数点数に対して使いたい時には`order_float::OrderedFloat<f64>` が利用できます。
+
+# permutohidron
+
+順列生成のアリゴリズムの実装です。次のように使うことができます。
+
+```rust
+use permutohedron::heap_recursive;
+
+fn main() {
+    let mut x = vec![0, 1, 2, 3];
+ 
+     heap_recursive(&mut x, |p| {
+         println!("{:?}", p);
+     });
+ 
+// [0, 1, 2, 3]
+// [1, 0, 2, 3]
+// [2, 0, 1, 3]
+// [0, 2, 1, 3]
+// [1, 2, 0, 3]
+// [2, 1, 0, 3]
+// [3, 1, 0, 2]
+// [1, 3, 0, 2]
+// [0, 3, 1, 2]
+// [3, 0, 1, 2]
+// [1, 0, 3, 2]
+// [0, 1, 3, 2]
+// [0, 2, 3, 1]
+// [2, 0, 3, 1]
+// [3, 0, 2, 1]
+// [0, 3, 2, 1]
+// [2, 3, 0, 1]
+// [3, 2, 0, 1]
+// [3, 2, 1, 0]
+// [2, 3, 1, 0]
+// [1, 3, 2, 0]
+// [3, 1, 2, 0]
+// [2, 1, 3, 0]
+// [1, 2, 3, 0]
+
+}
+```
+
+# superslice
+
+二分探索が実装されています。`std::slice`にも`binary_search()`はありますが、
+目的の要素が複数含まれる場合はいずれか一つのインデックスが返されるという少し使いづらい仕様のため、
+c++の`lower_bound`や`upper_bound`に慣れている人は同じインターフェースのこちらの方が使いやすいかもしれません。
+
+```rust
+use superslice::*;
+ 
+fn main() {
+    let b = [1, 3];
+ 
+    assert_eq!(b.lower_bound(&1), 0);
+    assert_eq!(b.upper_bound(&1), 1);
+    assert_eq!(b.equal_range(&3), 1..2);
+}
+```
+
+# itertools
+
+itertoolsではiteratorに関する便利なメソッドが色々提供されています。
+自分が競技プログラミングで特に便利そうと思ったのは以下のメソッドです。
+
+- `.dedup()` : 連続する重複した要素を取り除く
+- `.unique()` : 重複した要素を取り除く
+- `.combinations(usize)` : 指定した個数の組み合わせのiteratorを返す
+- `.combinations_with_replacement(usize)` : 指定した個数の重複組み合わせのiteratorを返す
+- `.permutations(usize)` : 指定した個数の順列のiteratorを返す
+- `.join(&str)` : 区切り文字を要素間に挟んだStringを返す
+- `.format(&str)`: 区切り文字を要素間に挟んだFormatを返す
+
+それぞれ例を書いてみます。
+
+```rust
+use itertools::Itertools;
+
+fn main() {
+    let x = [1, 1, 2, 3, 2, 2, 1];
+    println!("{:?}", x.iter().dedup().collect::<Vec<_>>()); // [1, 2, 3, 2, 1]
+    println!("{:?}", x.iter().unique().collect::<Vec<_>>()); // [1, 2, 3]
+    let y = ["a", "b", "c"];
+    println!("{:?}", y.iter().combinations(2).collect::<Vec<_>>()); // [["a", "b"], ["a", "c"], ["b", "c"]]
+    println!("{:?}", y.iter().combinations_with_replacement(2).collect::<Vec<_>>());
+    // [["a", "a"], ["a", "b"], ["a", "c"], ["b", "b"], ["b", "c"], ["c", "c"]]
+    println!("{:?}", y.iter().permutations(2).collect::<Vec<_>>());
+    // [["a", "b"], ["a", "c"], ["b", "a"], ["b", "c"], ["c", "a"], ["c", "b"]]
+    println!("{:?}", y.iter().join("-")); // "a-b-c"
+    println!("{}", x.iter().format("^")); // 1^1^2^3^2^2^1
+}
+```
+
+# proconio
+
+入力データのパースが簡単になるライブラリです。c++のiostreamに慣れてしまうと他の言語での入力をパースするコードは冗長に感じてしまいますが、
+`proconio::input!`マクロを使うとかなり簡単に入力をパースすることができます。
+
+```rust
+use proconio::input;
+
+// input
+// ------
+// 5 3
+// 0 1 x
+// 1 2 y
+// 0 4 foo
+
+fn main() {
+    input! {
+        n: usize,
+        m: usize,
+        xs: [(usize, usize, String); m],
+    }
+
+    println!("{:?}", &xs[m-1]); // (0, 4, "foo")
+}
+```
+
+# まとめ
+
+今回の言語アップデート後のrustで利用可能なcrateをいくつか紹介してきました。
+今まではバージョンも古く、stdしか使えない環境で競技プログラミングをするには自作ライブラリを揃えないとなかなか難しいと感じていましたが、
+今回紹介したようなcrateは使いこなせば実装量が減り、バグらせにくいコードを書くことができると思うのでぜひマスターしたいですね。
