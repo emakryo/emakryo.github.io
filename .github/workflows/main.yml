@@ -37,5 +37,5 @@ jobs:
         ls | grep -v public | xargs rm -r
         mv public/* .
         git add .
-        git commit -m "Auto commit by Github actions https://github.com/emakryo/emakryo.github.io/actions/runs/$GITHUB_RUN_ID"
+        [ "`git diff --name-only --cached`" ] && git commit -m "Auto commit by Github actions https://github.com/emakryo/emakryo.github.io/actions/runs/$GITHUB_RUN_ID"
         git push origin master
