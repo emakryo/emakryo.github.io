@@ -3,6 +3,8 @@ languageCode = "ja-jp"
 title = "emakryo's blog"
 theme = "ananke"
 
+hasCJKLanguage = true
+
 [params]
 github = "https://github.com/emakryo/emakryo.github.io"
 twitter = "https://twitter.com/cruelturtle"
