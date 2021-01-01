@@ -19,4 +19,4 @@ Create new markdown in `content/posts`
 
 ## Publish
 
-Just push `source` branch to github.
+Just push `master` branch to Github.

@@ -4,6 +4,7 @@ title = "emakryo's blog"
 theme = "ananke"
 
 hasCJKLanguage = true
+googleAnalytics = "G-8K4KNS60G7"
 
 [params]
 github = "https://github.com/emakryo/emakryo.github.io"
