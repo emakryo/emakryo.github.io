@@ -31,7 +31,9 @@ jobs:
       run: git checkout -B public
 
     - name: Build
-      run: HUGO_ENV=production hugo -d docs
+      env:
+        HUGO_ENV: production
+      run: hugo -d docs
       
     - name: Publish
       run: |
