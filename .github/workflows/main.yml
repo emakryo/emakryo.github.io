@@ -26,16 +26,16 @@ jobs:
     
     - name: Hugo setup
       uses: peaceiris/actions-hugo@v2.4.13
-    
+
+    - name: Merge base branch
+      run: |
+        git checkout -B public
+
     - name: Build sites
-      run: hugo
+      run: hugo -d docs
       
     - name: Publish
       run: |
-        git fetch --depth=1 origin master
-        git checkout master
-        ls | grep -v public | xargs rm -r
-        mv public/* .
         git add .
         [ "`git diff --name-only --cached`" ] && git commit -m "Auto commit by Github actions https://github.com/emakryo/emakryo.github.io/actions/runs/$GITHUB_RUN_ID"
-        git push origin master
+        git push -f origin public
