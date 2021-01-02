@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ja-jp">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    
+    <title>emakryo&#39;s blog  | Completely Fair Schedulerについて</title>
+    <meta name="viewport" content="width=device-width,minimum-scale=1">
+    <meta name="generator" content="Hugo 0.80.0" />
+    
+    
+      <META NAME="ROBOTS" CONTENT="INDEX, FOLLOW">
+    
+
+    
+    
+      <link href="/dist/css/app.1cb140d8ba31d5b2f1114537dd04802a.css" rel="stylesheet">
+    
+
+    
+
+    
+      
+    
+
+    
+    
+    <meta property="og:title" content="Completely Fair Schedulerについて" />
+<meta property="og:description" content="この記事はLinux advent calendar 10日目の記事です。 以前までLinux kernel はO(1)スケジューラというものを使っていました。これは「詳解Linux カー" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://emakryo.github.io/posts/completely-fair-scheduler/" />
+<meta property="article:published_time" content="2015-12-10T00:00:00+09:00" />
+<meta property="article:modified_time" content="2015-12-10T00:00:00+09:00" />
+<meta itemprop="name" content="Completely Fair Schedulerについて">
+<meta itemprop="description" content="この記事はLinux advent calendar 10日目の記事です。 以前までLinux kernel はO(1)スケジューラというものを使っていました。これは「詳解Linux カー">
+<meta itemprop="datePublished" content="2015-12-10T00:00:00+09:00" />
+<meta itemprop="dateModified" content="2015-12-10T00:00:00+09:00" />
+<meta itemprop="wordCount" content="3936">
+
+
+
+<meta itemprop="keywords" content="" />
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Completely Fair Schedulerについて"/>
+<meta name="twitter:description" content="この記事はLinux advent calendar 10日目の記事です。 以前までLinux kernel はO(1)スケジューラというものを使っていました。これは「詳解Linux カー"/>
+
+      
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+	window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+	ga('create', 'G-8K4KNS60G7', 'auto');
+	
+	ga('send', 'pageview');
+}
+</script>
+<script async src='https://www.google-analytics.com/analytics.js'></script>
+
+      
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-8K4KNS60G7"></script>
+      <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-8K4KNS60G7');
+      </script>
+    
+
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.2/dist/katex.min.css" integrity="sha384-yFRtMMDnQtDRO8rLpMIKrtPCD5jdktao2TV19YiZYWMDkUR5GQZR/NOVTdquEx1j" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.10.2/dist/katex.min.js" integrity="sha384-9Nhn55MVVN0/4OFx7EE5kpFBPsEMZxKTCnA+4fqDmg12eCTqGi6+BB2LjY8brQxJ" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.10.2/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous"></script>
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      renderMathInElement(
+          document.body,
+          {
+              delimiters: [
+                  {left: "$$", right: "$$", display: true},
+                  {left: "\\[", right: "\\]", display: true},
+                  {left: "$", right: "$", display: false},
+                  {left: "\\(", right: "\\)", display: false}
+              ]
+          });
+      });
+    </script>
+  </head>
+
+  <body class="ma0 avenir bg-near-white production">
+
+    
+   
+  
+
+  <header>
+    <div class="bg-black">
+      <nav class="pv3 ph3 ph4-ns" role="navigation">
+  <div class="flex-l justify-between items-center center">
+    <a href="https://emakryo.github.io" class="f3 fw2 hover-white no-underline white-90 dib">
+      emakryo&#39;s blog
+    </a>
+    <div class="flex-l items-center">
+      
+
+      
+      
+
+
+
+
+<a href="https://twitter.com/cruelturtle" target="_blank" class="link-transition twitter link dib z-999 pt3 pt0-l mr1" title="Twitter link" rel="noopener" aria-label="follow on Twitter——Opens in a new window">
+  <svg height="32px"  style="enable-background:new 0 0 67 67;" version="1.1" viewBox="0 0 67 67" width="32px" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><path d="M37.167,22.283c-2.619,0.953-4.274,3.411-4.086,6.101  l0.063,1.038l-1.048-0.127c-3.813-0.487-7.145-2.139-9.974-4.915l-1.383-1.377l-0.356,1.017c-0.754,2.267-0.272,4.661,1.299,6.271  c0.838,0.89,0.649,1.017-0.796,0.487c-0.503-0.169-0.943-0.296-0.985-0.233c-0.146,0.149,0.356,2.076,0.754,2.839  c0.545,1.06,1.655,2.097,2.871,2.712l1.027,0.487l-1.215,0.021c-1.173,0-1.215,0.021-1.089,0.467  c0.419,1.377,2.074,2.839,3.918,3.475l1.299,0.444l-1.131,0.678c-1.676,0.976-3.646,1.526-5.616,1.568  C19.775,43.256,19,43.341,19,43.405c0,0.211,2.557,1.397,4.044,1.864c4.463,1.377,9.765,0.783,13.746-1.568  c2.829-1.673,5.657-5,6.978-8.221c0.713-1.716,1.425-4.851,1.425-6.354c0-0.975,0.063-1.102,1.236-2.267  c0.692-0.678,1.341-1.419,1.467-1.631c0.21-0.403,0.188-0.403-0.88-0.043c-1.781,0.636-2.033,0.551-1.152-0.402  c0.649-0.678,1.425-1.907,1.425-2.267c0-0.063-0.314,0.042-0.671,0.233c-0.377,0.212-1.215,0.53-1.844,0.72l-1.131,0.361l-1.027-0.7  c-0.566-0.381-1.361-0.805-1.781-0.932C39.766,21.902,38.131,21.944,37.167,22.283z M33,64C16.432,64,3,50.569,3,34S16.432,4,33,4  s30,13.431,30,30S49.568,64,33,64z" style="fill-rule:evenodd;clip-rule:evenodd;fill:;"/></svg>
+
+<span class="new-window"><svg  height="8px"  style="enable-background:new 0 0 1000 1000;" version="1.1" viewBox="0 0 1000 1000" width="8px" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+<path d="M598 128h298v298h-86v-152l-418 418-60-60 418-418h-152v-86zM810 810v-298h86v298c0 46-40 86-86 86h-596c-48 0-86-40-86-86v-596c0-46 38-86 86-86h298v86h-298v596h596z" style="fill-rule:evenodd;clip-rule:evenodd;fill:;"/>
+</svg>
+</span></a>
+
+
+
+
+<a href="https://www.linkedin.com/in/%e8%ab%92%e4%ba%ae-%e4%ba%80%e6%be%a4-8503a1176/?locale=en_US" target="_blank" class="link-transition linkedin link dib z-999 pt3 pt0-l mr1" title="LinkedIn link" rel="noopener" aria-label="follow on LinkedIn——Opens in a new window">
+  <svg  height="32px"  style="enable-background:new 0 0 65 65;" version="1.1" viewBox="0 0 65 65" width="32px" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <path d="M50.837,48.137V36.425c0-6.275-3.35-9.195-7.816-9.195  c-3.604,0-5.219,1.983-6.119,3.374V27.71h-6.79c0.09,1.917,0,20.427,0,20.427h6.79V36.729c0-0.609,0.044-1.219,0.224-1.655  c0.49-1.22,1.607-2.483,3.482-2.483c2.458,0,3.44,1.873,3.44,4.618v10.929H50.837z M22.959,24.922c2.367,0,3.842-1.57,3.842-3.531  c-0.044-2.003-1.475-3.528-3.797-3.528s-3.841,1.524-3.841,3.528c0,1.961,1.474,3.531,3.753,3.531H22.959z M34,64  C17.432,64,4,50.568,4,34C4,17.431,17.432,4,34,4s30,13.431,30,30C64,50.568,50.568,64,34,64z M26.354,48.137V27.71h-6.789v20.427  H26.354z" style="fill-rule:evenodd;clip-rule:evenodd;fill:;"/>
+</svg>
+
+<span class="new-window"><svg  height="8px"  style="enable-background:new 0 0 1000 1000;" version="1.1" viewBox="0 0 1000 1000" width="8px" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+<path d="M598 128h298v298h-86v-152l-418 418-60-60 418-418h-152v-86zM810 810v-298h86v298c0 46-40 86-86 86h-596c-48 0-86-40-86-86v-596c0-46 38-86 86-86h298v86h-298v596h596z" style="fill-rule:evenodd;clip-rule:evenodd;fill:;"/>
+</svg>
+</span></a>
+
+
+<a href="https://github.com/emakryo/emakryo.github.io" target="_blank" class="link-transition github link dib z-999 pt3 pt0-l mr1" title="Github link" rel="noopener" aria-label="follow on Github——Opens in a new window">
+  <svg  height="32px"  style="enable-background:new 0 0 512 512;" version="1.1" viewBox="0 0 512 512" width="32px" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+  <path d="M256,32C132.3,32,32,134.8,32,261.7c0,101.5,64.2,187.5,153.2,217.9c11.2,2.1,15.3-5,15.3-11.1   c0-5.5-0.2-19.9-0.3-39.1c-62.3,13.9-75.5-30.8-75.5-30.8c-10.2-26.5-24.9-33.6-24.9-33.6c-20.3-14.3,1.5-14,1.5-14   c22.5,1.6,34.3,23.7,34.3,23.7c20,35.1,52.4,25,65.2,19.1c2-14.8,7.8-25,14.2-30.7c-49.7-5.8-102-25.5-102-113.5   c0-25.1,8.7-45.6,23-61.6c-2.3-5.8-10-29.2,2.2-60.8c0,0,18.8-6.2,61.6,23.5c17.9-5.1,37-7.6,56.1-7.7c19,0.1,38.2,2.6,56.1,7.7   c42.8-29.7,61.5-23.5,61.5-23.5c12.2,31.6,4.5,55,2.2,60.8c14.3,16.1,23,36.6,23,61.6c0,88.2-52.4,107.6-102.3,113.3   c8,7.1,15.2,21.1,15.2,42.5c0,30.7-0.3,55.5-0.3,63c0,6.1,4,13.3,15.4,11C415.9,449.1,480,363.1,480,261.7   C480,134.8,379.7,32,256,32z"/>
+</svg>
+
+<span class="new-window"><svg  height="8px"  style="enable-background:new 0 0 1000 1000;" version="1.1" viewBox="0 0 1000 1000" width="8px" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+<path d="M598 128h298v298h-86v-152l-418 418-60-60 418-418h-152v-86zM810 810v-298h86v298c0 46-40 86-86 86h-596c-48 0-86-40-86-86v-596c0-46 38-86 86-86h298v86h-298v596h596z" style="fill-rule:evenodd;clip-rule:evenodd;fill:;"/>
+</svg>
+</span></a>
+
+
+
+
+
+
+
+    </div>
+  </div>
+</nav>
+
+    </div>
+  </header>
+
+
+
+    <main class="pb7" role="main">
+      
+  
+  <article class="flex-l flex-wrap justify-between mw8 center ph3">
+    <header class="mt4 w-100">
+      <aside class="instapaper_ignoref b helvetica tracked">
+          
+        POSTS
+      </aside>
+      
+
+
+
+
+  <div id="sharing" class="mt3">
+
+    
+    <a href="https://www.facebook.com/sharer.php?u=https://emakryo.github.io/posts/completely-fair-scheduler/" class="facebook no-underline" aria-label="share on Facebook">
+      <svg height="32px"  style="enable-background:new 0 0 67 67;" version="1.1" viewBox="0 0 67 67" width="32px" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><path d="M28.765,50.32h6.744V33.998h4.499l0.596-5.624h-5.095  l0.007-2.816c0-1.466,0.14-2.253,2.244-2.253h2.812V17.68h-4.5c-5.405,0-7.307,2.729-7.307,7.317v3.377h-3.369v5.625h3.369V50.32z   M33,64C16.432,64,3,50.569,3,34S16.432,4,33,4s30,13.431,30,30S49.568,64,33,64z" style="fill-rule:evenodd;clip-rule:evenodd;"/></svg>
+
+    </a>
+
+    
+    
+    <a href="https://twitter.com/share?url=https://emakryo.github.io/posts/completely-fair-scheduler/&amp;text=Completely%20Fair%20Scheduler%e3%81%ab%e3%81%a4%e3%81%84%e3%81%a6" class="twitter no-underline" aria-label="share on Twitter">
+      <svg height="32px"  style="enable-background:new 0 0 67 67;" version="1.1" viewBox="0 0 67 67" width="32px" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><path d="M37.167,22.283c-2.619,0.953-4.274,3.411-4.086,6.101  l0.063,1.038l-1.048-0.127c-3.813-0.487-7.145-2.139-9.974-4.915l-1.383-1.377l-0.356,1.017c-0.754,2.267-0.272,4.661,1.299,6.271  c0.838,0.89,0.649,1.017-0.796,0.487c-0.503-0.169-0.943-0.296-0.985-0.233c-0.146,0.149,0.356,2.076,0.754,2.839  c0.545,1.06,1.655,2.097,2.871,2.712l1.027,0.487l-1.215,0.021c-1.173,0-1.215,0.021-1.089,0.467  c0.419,1.377,2.074,2.839,3.918,3.475l1.299,0.444l-1.131,0.678c-1.676,0.976-3.646,1.526-5.616,1.568  C19.775,43.256,19,43.341,19,43.405c0,0.211,2.557,1.397,4.044,1.864c4.463,1.377,9.765,0.783,13.746-1.568  c2.829-1.673,5.657-5,6.978-8.221c0.713-1.716,1.425-4.851,1.425-6.354c0-0.975,0.063-1.102,1.236-2.267  c0.692-0.678,1.341-1.419,1.467-1.631c0.21-0.403,0.188-0.403-0.88-0.043c-1.781,0.636-2.033,0.551-1.152-0.402  c0.649-0.678,1.425-1.907,1.425-2.267c0-0.063-0.314,0.042-0.671,0.233c-0.377,0.212-1.215,0.53-1.844,0.72l-1.131,0.361l-1.027-0.7  c-0.566-0.381-1.361-0.805-1.781-0.932C39.766,21.902,38.131,21.944,37.167,22.283z M33,64C16.432,64,3,50.569,3,34S16.432,4,33,4  s30,13.431,30,30S49.568,64,33,64z" style="fill-rule:evenodd;clip-rule:evenodd;fill:;"/></svg>
+
+    </a>
+
+    
+    <a href="https://www.linkedin.com/shareArticle?mini=true&amp;url=https://emakryo.github.io/posts/completely-fair-scheduler/&amp;title=Completely%20Fair%20Scheduler%e3%81%ab%e3%81%a4%e3%81%84%e3%81%a6" class="linkedin no-underline" aria-label="share on LinkedIn">
+      <svg  height="32px"  style="enable-background:new 0 0 65 65;" version="1.1" viewBox="0 0 65 65" width="32px" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <path d="M50.837,48.137V36.425c0-6.275-3.35-9.195-7.816-9.195  c-3.604,0-5.219,1.983-6.119,3.374V27.71h-6.79c0.09,1.917,0,20.427,0,20.427h6.79V36.729c0-0.609,0.044-1.219,0.224-1.655  c0.49-1.22,1.607-2.483,3.482-2.483c2.458,0,3.44,1.873,3.44,4.618v10.929H50.837z M22.959,24.922c2.367,0,3.842-1.57,3.842-3.531  c-0.044-2.003-1.475-3.528-3.797-3.528s-3.841,1.524-3.841,3.528c0,1.961,1.474,3.531,3.753,3.531H22.959z M34,64  C17.432,64,4,50.568,4,34C4,17.431,17.432,4,34,4s30,13.431,30,30C64,50.568,50.568,64,34,64z M26.354,48.137V27.71h-6.789v20.427  H26.354z" style="fill-rule:evenodd;clip-rule:evenodd;fill:;"/>
+</svg>
+
+    </a>
+  </div>
+
+      <h1 class="f1 avenir mt3 mb1">Completely Fair Schedulerについて</h1>
+      
+      
+      <time class="f6 mv4 dib tracked" datetime="2015-12-10T00:00:00&#43;09:00">December 10, 2015</time>
+
+      
+      
+    </header>
+    <div class="nested-copy-line-height lh-copy sans-serif f5 nested-links nested-img mid-gray pr4-l w-100-l"><p>この記事はLinux advent calendar 10日目の記事です。</p>
+<p>以前までLinux kernel はO(1)スケジューラというものを使っていました。これは「詳解Linux カーネル第３版」に詳しく説明があると思います。
+この記事ではその後、v2.6.23から導入されたCompletely Fair Scheduler(CFS)についてまとめます。多分に間違いがあるかもしれないのでまさかりを投げてください。</p>
+<h2 id="スケジューリングとは">スケジューリングとは</h2>
+<p>あまりLinuxカーネルに馴染みのない人のためにざっくりスケジューリングについて説明します。</p>
+<p>LinuxやWindowsといったOSでは普通、プロセスは複数同時に動いているように見えます。
+しかし、実は短時間でプロセスを切り替えることで人間からは同時に動いているように見えているだけなのです。
+（追記：最近ではマルチコアCPUが一般的ですが、一つのコアに関しては同じことが言えます）
+このとき順番にプロセスを切り替えるというのが最も単純なスケジューラですが、もちろんすべてのプロセスは対等ではありませんし、
+それぞれのプロセスに状態があり、デバイスの読み書きのような時間のかかる処理の完了を待っていたり、他プロセスからのシグナルを待っていたりして、実行可能ではないプロセスも存在します。
+そのため、Linuxカーネルはそこそこ複雑なスケジューリングの機構を用意することで無駄の少なく、応答性の高いシステムを実現しています。</p>
+<h2 id="スケジューリングクラス">スケジューリングクラス</h2>
+<p>Linuxはスケジューリングクラスという概念を導入しています。
+これはそれぞれのプロセスが異なるスケジューリングポリシーを持つことができるというもので、v4.xでは</p>
+<ul>
+<li>stop_sched_class</li>
+<li>dl_sched_class</li>
+<li>rt_sched_class</li>
+<li>fair_sched_class</li>
+<li>idle_sched_class</li>
+</ul>
+<p>の5つがあります。
+これらのスケジューリングクラスは上記の順で連結リストになっていて、
+上の方が優先度が高くなっています。</p>
+<p>この中のfair_sched_class がCFSスケジューラに相当するものです。</p>
+<h2 id="completely-fair-scheduler-cfs">Completely Fair Scheduler (CFS)</h2>
+<p>ここからが本題のCFSに関する説明です。<code>kernel/sched/fair.c</code>に実装があります。</p>
+<p>CFSではプロセスを赤黒木で管理します。赤黒木は平衡２分木のひとつで値の挿入、削除、探索が $\displaystyle O(\log n)$
+でできるというデータ構造です。また、木の一番左（値が最小）の要素はキャッシュされているので
+$\displaystyle O(1)$ で取得できます。</p>
+<p>この赤黒木は <code>sched_entity</code>を要素、その中の<code>vruntime</code>をキーとしています。
+<code>sched_entity</code>はかならずしもプロセスに対応するものではありませんが、
+とりあえず、プロセスに対して１つ存在すると思ってもらって大丈夫です。（Group Scheduling が絡んでいます）</p>
+<p>赤黒木のキーとなるvruntimeですが、これはプロセスの仮想実行時間を表しています。
+仮想実行時間とはその名の通りプロセスが実行された合計時間（のようなもの）です。
+この仮想実行時間が短いプロセスから選んでスケジューリングすることで
+すべてのプロセスに平等なスケジューリングを実現しようとしています。</p>
+<h3 id="データ構造">データ構造</h3>
+<p>スケジューリングに関する構造体は次のようなものがあります。</p>
+<ul>
+<li><a href="http://lxr.free-electrons.com/source/include/linux/sched.h?v=4.0#L1277">task_struct</a></li>
+<li><a href="http://lxr.free-electrons.com/source/kernel/sched/sched.h?v=4.0#L1143">sched_class</a></li>
+<li><a href="http://lxr.free-electrons.com/source/include/linux/sched.h?v=4.0#L1164">sched_entity</a></li>
+<li><a href="http://lxr.free-electrons.com/source/kernel/sched/sched.h?v=4.0#L538">rq</a></li>
+<li><a href="http://lxr.free-electrons.com/source/kernel/sched/sched.h?v=4.0#L336">cfs_rq</a></li>
+<li><a href="http://lxr.free-electrons.com/source/include/linux/sched.h?v=4.0#L1111">load_weight</a></li>
+</ul>
+<p>順に説明していきます。</p>
+<h3 id="task_struct">task_struct</h3>
+<p>とにかく長いです。400行以上あります。
+プロセスに関する情報はすべてこの構造体に収められているのでしょうがないです。
+特に大事そうなフィールドだけ紹介します。</p>
+<h4 id="state">state</h4>
+<p>プロセスの状態を簡潔に表します。次のような値をとるようです。<a href="http://lxr.free-electrons.com/source/include/linux/sched.h?v=4.0#L203"><code>include/linux/sched.h</code></a></p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-c" data-lang="c"><span style="color:#75715e">#define TASK_RUNNING		0
+</span><span style="color:#75715e">#define TASK_INTERRUPTIBLE	1
+</span><span style="color:#75715e">#define TASK_UNINTERRUPTIBLE	2
+</span><span style="color:#75715e">#define __TASK_STOPPED		4
+</span><span style="color:#75715e">#define __TASK_TRACED		8
+</span><span style="color:#75715e"></span><span style="color:#75715e">/* in tsk-&gt;exit_state */</span>
+<span style="color:#75715e">#define EXIT_DEAD		16
+</span><span style="color:#75715e">#define EXIT_ZOMBIE		32
+</span><span style="color:#75715e">#define EXIT_TRACE		(EXIT_ZOMBIE | EXIT_DEAD)
+</span><span style="color:#75715e"></span><span style="color:#75715e">/* in tsk-&gt;state again */</span>
+<span style="color:#75715e">#define TASK_DEAD		64
+</span><span style="color:#75715e">#define TASK_WAKEKILL		128
+</span><span style="color:#75715e">#define TASK_WAKING		256
+</span><span style="color:#75715e">#define TASK_PARKED		512
+</span><span style="color:#75715e">#define TASK_STATE_MAX		1024
+</span></code></pre></div><h4 id="on_rq">on_rq</h4>
+<p>rqにそのプロセスが入っているかどうかを表します。
+rqは後述します。</p>
+<h4 id="prio-static_prio-normal_prio">prio, static_prio, normal_prio</h4>
+<p>プロセスの優先度を表します。
+優先度は0から140までの値をとり、値が小さい方が優先度が高くなります。
+0から99まではリアルタイム優先度、100から139までがCFSで扱うプロセスの優先度となります。
+このプロセスの優先度はnice値によって決められ、nice値の -20 ~ 19が優先度の100 ~ 139にマップされてます。
+また、何もしないidleプロセスは140と決められています。</p>
+<h4 id="sched_class">sched_class</h4>
+<p>プロセスの属するスケジューリングクラスを表します。</p>
+<h4 id="sched_entity">sched_entity</h4>
+<p>プロセスに対応する<code>sched_entity</code>を表します。</p>
+<h3 id="sched_class-1">sched_class</h3>
+<p>スケジューリングクラスを表す構造体です。</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-c" data-lang="c"><span style="color:#66d9ef">struct</span> sched_class {
+	<span style="color:#66d9ef">const</span> <span style="color:#66d9ef">struct</span> sched_class <span style="color:#f92672">*</span>next;
+
+	<span style="color:#66d9ef">void</span> (<span style="color:#f92672">*</span>enqueue_task) (<span style="color:#66d9ef">struct</span> rq <span style="color:#f92672">*</span>rq, <span style="color:#66d9ef">struct</span> task_struct <span style="color:#f92672">*</span>p, <span style="color:#66d9ef">int</span> flags);
+	<span style="color:#66d9ef">void</span> (<span style="color:#f92672">*</span>dequeue_task) (<span style="color:#66d9ef">struct</span> rq <span style="color:#f92672">*</span>rq, <span style="color:#66d9ef">struct</span> task_struct <span style="color:#f92672">*</span>p, <span style="color:#66d9ef">int</span> flags);
+	<span style="color:#66d9ef">void</span> (<span style="color:#f92672">*</span>yield_task) (<span style="color:#66d9ef">struct</span> rq <span style="color:#f92672">*</span>rq);
+	<span style="color:#66d9ef">bool</span> (<span style="color:#f92672">*</span>yield_to_task) (<span style="color:#66d9ef">struct</span> rq <span style="color:#f92672">*</span>rq, <span style="color:#66d9ef">struct</span> task_struct <span style="color:#f92672">*</span>p, <span style="color:#66d9ef">bool</span> preempt);
+
+	<span style="color:#66d9ef">void</span> (<span style="color:#f92672">*</span>check_preempt_curr) (<span style="color:#66d9ef">struct</span> rq <span style="color:#f92672">*</span>rq, <span style="color:#66d9ef">struct</span> task_struct <span style="color:#f92672">*</span>p, <span style="color:#66d9ef">int</span> flags);
+
+	<span style="color:#75715e">/*
+</span><span style="color:#75715e">	 * It is the responsibility of the pick_next_task() method that will
+</span><span style="color:#75715e">	 * return the next task to call put_prev_task() on the @prev task or
+</span><span style="color:#75715e">	 * something equivalent.
+</span><span style="color:#75715e">	 *
+</span><span style="color:#75715e">	 * May return RETRY_TASK when it finds a higher prio class has runnable
+</span><span style="color:#75715e">	 * tasks.
+</span><span style="color:#75715e">	 */</span>
+	<span style="color:#66d9ef">struct</span> task_struct <span style="color:#f92672">*</span> (<span style="color:#f92672">*</span>pick_next_task) (<span style="color:#66d9ef">struct</span> rq <span style="color:#f92672">*</span>rq,
+						<span style="color:#66d9ef">struct</span> task_struct <span style="color:#f92672">*</span>prev);
+	<span style="color:#66d9ef">void</span> (<span style="color:#f92672">*</span>put_prev_task) (<span style="color:#66d9ef">struct</span> rq <span style="color:#f92672">*</span>rq, <span style="color:#66d9ef">struct</span> task_struct <span style="color:#f92672">*</span>p);
+
+<span style="color:#75715e">/* 中略 */</span>
+
+	<span style="color:#66d9ef">void</span> (<span style="color:#f92672">*</span>set_curr_task) (<span style="color:#66d9ef">struct</span> rq <span style="color:#f92672">*</span>rq);
+
+<span style="color:#75715e">/* 中略 */</span>
+};
+</code></pre></div><p>関数ポインタがたくさんあり、スケジューリングクラスごとに異なる操作を統一して行えるようにしています。
+上に書いたスケジューリングクラスがそれぞれどこかで宣言されています。</p>
+<h3 id="sched_entity-1">sched_entity</h3>
+<p>上で説明した赤黒木のノードに対応する構造体です。</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-c" data-lang="c"><span style="color:#66d9ef">struct</span> sched_entity {
+	<span style="color:#66d9ef">struct</span> load_weight	load;		<span style="color:#75715e">/* for load-balancing */</span>
+	<span style="color:#66d9ef">struct</span> rb_node		run_node;
+	<span style="color:#66d9ef">struct</span> list_head	group_node;
+	<span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">int</span>		on_rq;
+
+	u64			exec_start;
+	u64			sum_exec_runtime;
+	u64			vruntime;
+	u64			prev_sum_exec_runtime;
+
+<span style="color:#75715e">/* 略 */</span>
+};
+</code></pre></div><p>この中に<code>vruntime</code>や実際の赤黒木のノードか収められています。
+<code>load</code>は優先度に基づいた重みが格納されます。</p>
+<h3 id="rq">rq</h3>
+<p>これも結構長いです。
+<code>rq</code>はrunqueueの略で実行可能なプロセス(の<code>sched_entity</code>)を管理する構造体です。
+よく使いそうなフィールドだけ紹介します。</p>
+<ul>
+<li><code>nr_running</code>: 実行可能なプロセスの数</li>
+<li><code>cfs</code>: CFSに属するプロセスの管理をする構造体</li>
+<li><code>dl</code>, <code>rt</code>: それぞれデッドラインスケジューラ、リアルタイムスケジューラで使われる構造体</li>
+<li><code>cfs_rq</code>: CFSに関連するデータを含む構造体</li>
+</ul>
+<p><code>cfs_rq</code>構造体の定義は次のようになっています。</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-c" data-lang="c"><span style="color:#66d9ef">struct</span> cfs_rq {
+	<span style="color:#66d9ef">struct</span> load_weight load;
+	<span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">int</span> nr_running, h_nr_running;
+
+	u64 exec_clock;
+	u64 min_vruntime;
+
+	<span style="color:#66d9ef">struct</span> rb_root tasks_timeline;
+	<span style="color:#66d9ef">struct</span> rb_node <span style="color:#f92672">*</span>rb_leftmost;
+
+	<span style="color:#75715e">/*
+</span><span style="color:#75715e">	 * &#39;curr&#39; points to currently running entity on this cfs_rq.
+</span><span style="color:#75715e">	 * It is set to NULL otherwise (i.e when none are currently running).
+</span><span style="color:#75715e">	 */</span>
+	<span style="color:#66d9ef">struct</span> sched_entity <span style="color:#f92672">*</span>curr, <span style="color:#f92672">*</span>next, <span style="color:#f92672">*</span>last, <span style="color:#f92672">*</span>skip;
+<span style="color:#75715e">/* 略 */</span>
+};
+</code></pre></div><p>赤黒木の根や、その最も左のノードへのポインタなどもこの中に含まれています。</p>
+<h3 id="load_weight">load_weight</h3>
+<p><code>load_weight</code> 構造体の中身はこれだけです。<code>sched_entity</code>や<code>cfs_rq</code>の中に含まれています。</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-c" data-lang="c"><span style="color:#66d9ef">struct</span> load_weight {
+	<span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">long</span> weight;
+	u32 inv_weight;
+};
+</code></pre></div><p>重みとその逆数だけです。
+何の重みかについては後述します。</p>
+<h2 id="処理">処理</h2>
+<p>ここからはプロセスの一生を通じてどのようにスケジューリングされるかおおまかに追っていきます。</p>
+<p>まずプロセスが生成されると、スケジューリング関連の値は<a href="http://lxr.free-electrons.com/source/kernel/sched/core.c#L2161"><code>sched_fork()</code></a>の中で初期化されます。
+そのあと<a href="http://lxr.free-electrons.com/source/kernel/sched/fair.c?v=4.0#L7733"><code>task_fork_fair()</code></a>の中で<code>sched_entity</code>の<code>vruntime</code>の値は親のvruntimeの値になります。
+しかしその後<a href="http://lxr.free-electrons.com/source/kernel/sched/fair.c#L2940"><code>place_entity()</code></a> が呼ばれ、<code>vruntime</code>の値はそれまでの<code>vruntime</code>の値に
+１回実行権が与えられたときの実行時間が足されます。
+これにより、次々とforkが起こる事で新たに作られたプロセスばかりが実行されないようになります。
+(<code>task_fork_fair()</code>の中で<code>vruntime</code>から<code>cfs_rq.min_vruntime</code>の値が引かれていますが、これはまた<code>enqueue_entity()</code>のなかで足されて戻ります。
+おそらく眠りから覚めたプロセスと扱いを揃えるため？)</p>
+<p>また、<code>sched_entity</code>中の<code>load.weight</code>がプロセスの<code>static_prio</code>に基づいて<a href="http://lxr.free-electrons.com/source/kernel/sched/core.c?v=4.0#L767"><code>set_load_weight()</code></a>で初期化されます。
+実際の重みは優先度ごとにあらかじめ値が決められています。(<a href="http://lxr.free-electrons.com/source/kernel/sched/sched.h?v=4.0#L1101"><code>prio_to_weight[]</code></a>)
+重みは優先度が高いほど大きく、優先度が低いほど小さく定められています。式で書くと
+<code>weight = 1.25^(-nice) * 1024</code>ぐらいみたいです。
+最後に<code>do_fork()</code>から<code>wake_up_new_task()</code>が呼ばれ、プロセスが赤黒木に入ります。</p>
+<p>その後、<code>schedule()</code>の中で<a href="http://lxr.free-electrons.com/source/kernel/sched/core.c#L2983"><code>pick_next_task()</code></a>が呼ばれることで次に実行するプロセスを選択します。
+プロセスの選択はまず、すべての実行可能なプロセスがCFSクラスに属するとき、直接CFSクラスの<code>pick_next_task()</code>を、
+そうでないときは、すべてのスケジューリングクラスの<code>pick_next_task()</code>を順に呼び出しています。
+CFSでは次に赤黒木の最も左の要素(次に実行されるプロセスの<code>sched_entity</code>)を削除し、それまで走っていたプロセスの<code>sched_entity</code>を木に挿入するという操作をします。</p>
+<p>また、<code>pick_next_task_fair()</code>の中の<a href="http://lxr.free-electrons.com/source/kernel/sched/fair.c#L700"><code>update_curr()</code></a>で、
+それまで走っていたプロセスの<code>vruntime</code>に実行時間が重みで割られた値が足されます。これにより優先度が高いプロセスはほとんど実行されてないとみなされ、
+優先的に実行されやすくなります。一方優先度の低いプロセスは長い間実行されたとみなされるため、次に実行されるのはしばらくあとになる可能性が高くなります。</p>
+<p>これを繰り返すことで、常に仮想実行時間のもっとも小さいプロセスが選択されて、平等に（感じられるように）スケジューリングが進んでいきます。</p>
+<p>プロセスが死ぬときは、<code>do_exit()</code>の中で<code>tsk-&gt;state = TASK_DEAD</code>と設定することで、<code>__schedule()</code>の中で
+<code>prev-&gt;on_rq</code>が0になり、<code>pick_next_task()</code>の中で<code>put_prev_entity()</code>が呼ばれても、そのプロセスを赤黒木に挿入しなくなります。</p>
+<p>以上で終わりです。</p>
+<p>あまり時間がなくてこの程度のことしか調べられませんでしたが、実際のところはこれに加えて
+SMPにおけるロードバランシングや、グループスケジューリングによりもっと複雑なことをしています。</p>
+<p>ほんとはもっとちゃんとまとめる形にしたかったのですが、
+こんな乱文になってしまい無念..</p>
+<h2 id="参考文献">参考文献</h2>
+<ul>
+<li>詳解Linux カーネル第３版</li>
+<li><a href="https://www.ibm.com/developerworks/jp/linux/library/l-completely-fair-scheduler/">https://www.ibm.com/developerworks/jp/linux/library/l-completely-fair-scheduler/</a></li>
+<li><a href="http://amiq11.tumblr.com/post/41152252069/linux%E3%82%B9%E3%82%B1%E3%82%B8%E3%83%A5%E3%83%BC%E3%83%A9-%E6%A6%82%E8%A6%81">http://amiq11.tumblr.com/post/41152252069/linux%E3%82%B9%E3%82%B1%E3%82%B8%E3%83%A5%E3%83%BC%E3%83%A9-%E6%A6%82%E8%A6%81</a></li>
+</ul>
+<ul class="pa0">
+  
+</ul>
+<div class="mt6 instapaper_ignoref">
+      
+      
+      </div>
+    </div>
+
+    <aside class="w-30-l mt6-l">
+
+
+
+
+</aside>
+
+  </article>
+
+    </main>
+    <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
+  <div class="flex justify-between">
+  <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://emakryo.github.io" >
+    &copy;  emakryo's blog 2021 
+  </a>
+    <div>
+
+
+
+
+<a href="https://twitter.com/cruelturtle" target="_blank" class="link-transition twitter link dib z-999 pt3 pt0-l mr1" title="Twitter link" rel="noopener" aria-label="follow on Twitter——Opens in a new window">
+  <svg height="32px"  style="enable-background:new 0 0 67 67;" version="1.1" viewBox="0 0 67 67" width="32px" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><path d="M37.167,22.283c-2.619,0.953-4.274,3.411-4.086,6.101  l0.063,1.038l-1.048-0.127c-3.813-0.487-7.145-2.139-9.974-4.915l-1.383-1.377l-0.356,1.017c-0.754,2.267-0.272,4.661,1.299,6.271  c0.838,0.89,0.649,1.017-0.796,0.487c-0.503-0.169-0.943-0.296-0.985-0.233c-0.146,0.149,0.356,2.076,0.754,2.839  c0.545,1.06,1.655,2.097,2.871,2.712l1.027,0.487l-1.215,0.021c-1.173,0-1.215,0.021-1.089,0.467  c0.419,1.377,2.074,2.839,3.918,3.475l1.299,0.444l-1.131,0.678c-1.676,0.976-3.646,1.526-5.616,1.568  C19.775,43.256,19,43.341,19,43.405c0,0.211,2.557,1.397,4.044,1.864c4.463,1.377,9.765,0.783,13.746-1.568  c2.829-1.673,5.657-5,6.978-8.221c0.713-1.716,1.425-4.851,1.425-6.354c0-0.975,0.063-1.102,1.236-2.267  c0.692-0.678,1.341-1.419,1.467-1.631c0.21-0.403,0.188-0.403-0.88-0.043c-1.781,0.636-2.033,0.551-1.152-0.402  c0.649-0.678,1.425-1.907,1.425-2.267c0-0.063-0.314,0.042-0.671,0.233c-0.377,0.212-1.215,0.53-1.844,0.72l-1.131,0.361l-1.027-0.7  c-0.566-0.381-1.361-0.805-1.781-0.932C39.766,21.902,38.131,21.944,37.167,22.283z M33,64C16.432,64,3,50.569,3,34S16.432,4,33,4  s30,13.431,30,30S49.568,64,33,64z" style="fill-rule:evenodd;clip-rule:evenodd;fill:;"/></svg>
+
+<span class="new-window"><svg  height="8px"  style="enable-background:new 0 0 1000 1000;" version="1.1" viewBox="0 0 1000 1000" width="8px" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+<path d="M598 128h298v298h-86v-152l-418 418-60-60 418-418h-152v-86zM810 810v-298h86v298c0 46-40 86-86 86h-596c-48 0-86-40-86-86v-596c0-46 38-86 86-86h298v86h-298v596h596z" style="fill-rule:evenodd;clip-rule:evenodd;fill:;"/>
+</svg>
+</span></a>
+
+
+
+
+<a href="https://www.linkedin.com/in/%e8%ab%92%e4%ba%ae-%e4%ba%80%e6%be%a4-8503a1176/?locale=en_US" target="_blank" class="link-transition linkedin link dib z-999 pt3 pt0-l mr1" title="LinkedIn link" rel="noopener" aria-label="follow on LinkedIn——Opens in a new window">
+  <svg  height="32px"  style="enable-background:new 0 0 65 65;" version="1.1" viewBox="0 0 65 65" width="32px" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <path d="M50.837,48.137V36.425c0-6.275-3.35-9.195-7.816-9.195  c-3.604,0-5.219,1.983-6.119,3.374V27.71h-6.79c0.09,1.917,0,20.427,0,20.427h6.79V36.729c0-0.609,0.044-1.219,0.224-1.655  c0.49-1.22,1.607-2.483,3.482-2.483c2.458,0,3.44,1.873,3.44,4.618v10.929H50.837z M22.959,24.922c2.367,0,3.842-1.57,3.842-3.531  c-0.044-2.003-1.475-3.528-3.797-3.528s-3.841,1.524-3.841,3.528c0,1.961,1.474,3.531,3.753,3.531H22.959z M34,64  C17.432,64,4,50.568,4,34C4,17.431,17.432,4,34,4s30,13.431,30,30C64,50.568,50.568,64,34,64z M26.354,48.137V27.71h-6.789v20.427  H26.354z" style="fill-rule:evenodd;clip-rule:evenodd;fill:;"/>
+</svg>
+
+<span class="new-window"><svg  height="8px"  style="enable-background:new 0 0 1000 1000;" version="1.1" viewBox="0 0 1000 1000" width="8px" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+<path d="M598 128h298v298h-86v-152l-418 418-60-60 418-418h-152v-86zM810 810v-298h86v298c0 46-40 86-86 86h-596c-48 0-86-40-86-86v-596c0-46 38-86 86-86h298v86h-298v596h596z" style="fill-rule:evenodd;clip-rule:evenodd;fill:;"/>
+</svg>
+</span></a>
+
+
+<a href="https://github.com/emakryo/emakryo.github.io" target="_blank" class="link-transition github link dib z-999 pt3 pt0-l mr1" title="Github link" rel="noopener" aria-label="follow on Github——Opens in a new window">
+  <svg  height="32px"  style="enable-background:new 0 0 512 512;" version="1.1" viewBox="0 0 512 512" width="32px" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+  <path d="M256,32C132.3,32,32,134.8,32,261.7c0,101.5,64.2,187.5,153.2,217.9c11.2,2.1,15.3-5,15.3-11.1   c0-5.5-0.2-19.9-0.3-39.1c-62.3,13.9-75.5-30.8-75.5-30.8c-10.2-26.5-24.9-33.6-24.9-33.6c-20.3-14.3,1.5-14,1.5-14   c22.5,1.6,34.3,23.7,34.3,23.7c20,35.1,52.4,25,65.2,19.1c2-14.8,7.8-25,14.2-30.7c-49.7-5.8-102-25.5-102-113.5   c0-25.1,8.7-45.6,23-61.6c-2.3-5.8-10-29.2,2.2-60.8c0,0,18.8-6.2,61.6,23.5c17.9-5.1,37-7.6,56.1-7.7c19,0.1,38.2,2.6,56.1,7.7   c42.8-29.7,61.5-23.5,61.5-23.5c12.2,31.6,4.5,55,2.2,60.8c14.3,16.1,23,36.6,23,61.6c0,88.2-52.4,107.6-102.3,113.3   c8,7.1,15.2,21.1,15.2,42.5c0,30.7-0.3,55.5-0.3,63c0,6.1,4,13.3,15.4,11C415.9,449.1,480,363.1,480,261.7   C480,134.8,379.7,32,256,32z"/>
+</svg>
+
+<span class="new-window"><svg  height="8px"  style="enable-background:new 0 0 1000 1000;" version="1.1" viewBox="0 0 1000 1000" width="8px" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+<path d="M598 128h298v298h-86v-152l-418 418-60-60 418-418h-152v-86zM810 810v-298h86v298c0 46-40 86-86 86h-596c-48 0-86-40-86-86v-596c0-46 38-86 86-86h298v86h-298v596h596z" style="fill-rule:evenodd;clip-rule:evenodd;fill:;"/>
+</svg>
+</span></a>
+
+
+
+
+
+
+</div>
+  </div>
+</footer>
+
+    
+
+  <script src="/dist/js/app.3fc0f988d21662902933.js"></script>
+
+
+  </body>
+</html>
